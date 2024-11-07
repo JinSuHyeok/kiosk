@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>공주대학교 카페</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+            color: #333;
+            text-align: center;
+        }
+        h1 {
+            font-size: 36px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        .menu-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 30px;
+            padding: 0 10%;
+        }
+        .menu-item {
+            width: 33%;
+            background-color: #fff;
+            padding: 20px;
+            margin: 0 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: border 0.3s;
+        }
+        .menu-item.selected {
+            border: 3px solid #894EFD;
+            box-shadow: 0 4px 12px rgba(137, 78, 253, 0.3);
+        }
+        .menu-image {
+            width: 200px;  
+            height: 200px; 
+            border-radius: 10px;
+            margin-bottom: 15px;
+            object-fit: cover; 
+        }
+        .menu-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .menu-description {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        .price {
+            font-size: 20px;
+            font-weight: bold;
+            color: #444;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>공주대학교 카페</h1>
+    <div class="menu-container" id="menuContainer"></div>
+    <div id="updates"></div>
+    <audio id="audioPlayer" preload="auto"></audio>
+
+    <script>
+        var audioContext;
+        var currentSource;
+
+        window.onload = function() {
+            // Request audio permissions as soon as the window loads
+            navigator.mediaDevices.getUserMedia({ audio: true }).then(() => {
+                // Create the AudioContext
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log("Audio context created successfully");
+            }).catch(e => {
+                console.error(`Audio permissions denied: ${e}`);
+            });
+        };
+
+        const menuItems = [
+            {
+                name: "아메리카노",
+                image: "/images/americano.png",
+                description: "진한 에스프레소와 신선한 물의 조화",
+                price: "₩4,000",
+                audio: "/audio/audio_ame.mp3"
+            },
+            {
+                name: "카페 라떼",
+                image: "/images/cafelatte.png",
+                description: "부드러운 우유와 에스프레소의 완벽한 만남",
+                price: "₩5,000",
+                audio: "/audio/audio_cl.mp3"
+            },
+            {
+                name: "카푸치노",
+                image: "/images/vanilla.png",
+                description: "진한 에스프레소와 풍부한 거품의 향연",
+                price: "₩5,500",
+                audio: "/audio/audio_cc.mp3"
+            }
+        ];
+
+        let selectedMenuItem = null;
+        const ws = new WebSocket("ws://127.0.0.1:8000/ws");
+
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const direction = data.direction;
+
+            if (direction === "left") {
+                selectMenuItem(-1);
+            } else if (direction === "right") {
+                selectMenuItem(1);
+            }
+        };
+
+        function renderMenu() {
+            const menuContainer = document.getElementById("menuContainer");
+            menuItems.forEach((item, index) => {
+                const menuItemDiv = document.createElement("div");
+                menuItemDiv.className = "menu-item";
+                menuItemDiv.innerHTML = `
+                    <img src="${item.image}" alt="${item.name} 이미지" class="menu-image">
+                    <div class="menu-title">${item.name}</div>
+                    <div class="menu-description">${item.description}</div>
+                    <div class="price">${item.price}</div>
+                `;
+                menuContainer.appendChild(menuItemDiv);
+            });
+            // 초기 선택
+            // selectMenuItem(0);
+        }
+
+        function selectMenuItem(change) {
+            // 기존 선택된 메뉴 항목이 있으면 선택 해제
+            if (selectedMenuItem !== null) {
+                const previouslySelected = document.getElementsByClassName('menu-item')[selectedMenuItem];
+                previouslySelected.classList.remove("selected");
+            }
+
+            // 초기 선택이 없거나 방향에 따라 인덱스 변경
+            if (selectedMenuItem === null) {
+                selectedMenuItem = 0; // 처음 메뉴 선택
+            } else {
+                selectedMenuItem += change; // 인덱스 변경
+                if (selectedMenuItem < 0) {
+                    selectedMenuItem = menuItems.length - 1; // 마지막으로 이동
+                } else if (selectedMenuItem >= menuItems.length) {
+                    selectedMenuItem = 0; // 첫 번째로 이동
+                }
+            }
+
+            // 현재 선택된 메뉴 항목 표시
+            const currentlySelected = document.getElementsByClassName('menu-item')[selectedMenuItem];
+            currentlySelected.classList.add("selected");
+
+            playAudio(menuItems[selectedMenuItem].audio);
+        }
+
+        function playAudio(url) {
+            // 현재 재생 중인 오디오가 있다면 중지
+            if (currentSource) {
+                currentSource.stop(); // 현재 소스 중지
+            }
+
+            fetch(url)
+                .then(response => response.arrayBuffer())
+                .then(data => audioContext.decodeAudioData(data))
+                .then(buffer => {
+                    currentSource = audioContext.createBufferSource(); // 새로운 소스 생성
+                    currentSource.buffer = buffer;
+                    currentSource.connect(audioContext.destination); // 스피커에 연결
+                    currentSource.start(0); // 오디오 재생
+                })
+                .catch(err => console.error(err));
+        }
+
+        // Render the menu items on page load
+        renderMenu();
+    </script>
+
+</body>
+</html>
