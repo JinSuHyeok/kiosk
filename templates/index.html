@@ -110,16 +110,41 @@
         ];
 
         let selectedMenuItem = null;
+let isAudioPlaying = false; 
         const ws = new WebSocket("ws://127.0.0.1:8000/ws");
 
+        ws.onopen = function() {
+            console.log("WebSocket connection opened");
+        };
+
         ws.onmessage = function(event) {
+            if (isAudioPlaying) {
+        console.log("Audio is playing. Ignoring onmessage updates.");
+        return; // 음성이 재생 중이면 변경 무시
+    }
+
             const data = JSON.parse(event.data);
             const direction = data.direction;
+            const menu = data.menu;
 
-            if (direction === "left") {
+            if(direction){
+                if (direction === "left") {
                 selectMenuItem(-1);
             } else if (direction === "right") {
                 selectMenuItem(1);
+            }
+            }
+            else if(menu){
+                console.log(menu);
+                if (menu === "ame") {
+                    selectMenuItemWithIndex(0);
+                }
+                else if (menu === "cl") {
+                    selectMenuItemWithIndex(1);
+            }
+                else if (menu === "cc") {
+                    selectMenuItemWithIndex(2);
+                }
             }
         };
 
@@ -166,23 +191,62 @@
             playAudio(menuItems[selectedMenuItem].audio);
         }
 
-        function playAudio(url) {
-            // 현재 재생 중인 오디오가 있다면 중지
-            if (currentSource) {
-                currentSource.stop(); // 현재 소스 중지
-            }
+        function selectMenuItemWithIndex(index) {
+    // 인덱스가 유효하지 않으면 종료
+    if (index < 0 || index >= menuItems.length) {
+        console.error("Invalid index:", index);
+        return;
+    }
 
-            fetch(url)
-                .then(response => response.arrayBuffer())
-                .then(data => audioContext.decodeAudioData(data))
-                .then(buffer => {
-                    currentSource = audioContext.createBufferSource(); // 새로운 소스 생성
-                    currentSource.buffer = buffer;
-                    currentSource.connect(audioContext.destination); // 스피커에 연결
-                    currentSource.start(0); // 오디오 재생
-                })
-                .catch(err => console.error(err));
-        }
+    // 기존 선택된 메뉴 항목이 있으면 선택 해제
+    if (selectedMenuItem !== null) {
+        const previouslySelected = document.getElementsByClassName('menu-item')[selectedMenuItem];
+        previouslySelected.classList.remove("selected");
+    }
+
+    // 새로운 선택 인덱스 설정
+    selectedMenuItem = index;
+
+    // 현재 선택된 메뉴 항목 표시
+    const currentlySelected = document.getElementsByClassName('menu-item')[selectedMenuItem];
+    currentlySelected.classList.add("selected");
+
+    // 오디오 재생
+    playAudio(menuItems[selectedMenuItem].audio);
+}
+
+
+        function playAudio(url) {
+    if (isAudioPlaying) {
+        console.log("Audio is already playing.");
+        return; // 이미 재생 중이면 새 오디오 재생 방지
+    }
+
+    isAudioPlaying = true; // 재생 시작
+    if (currentSource) {
+        currentSource.stop(); // 현재 소스 중지
+    }
+
+    fetch(url)
+        .then(response => response.arrayBuffer())
+        .then(data => audioContext.decodeAudioData(data))
+        .then(buffer => {
+            currentSource = audioContext.createBufferSource(); // 새로운 소스 생성
+            currentSource.buffer = buffer;
+            currentSource.connect(audioContext.destination); // 스피커에 연결
+            currentSource.start(0); // 오디오 재생
+
+            // 오디오 종료 시 이벤트 처리
+            currentSource.onended = () => {
+                isAudioPlaying = false; // 재생 종료
+                console.log("Audio playback ended.");
+            };
+        })
+        .catch(err => {
+            console.error(err);
+            isAudioPlaying = false; // 오류 발생 시 플래그 해제
+        });
+}
 
         // Render the menu items on page load
         renderMenu();

@@ -43,6 +43,14 @@ async def send_direction(direction: str = Path(...)):
         await client.send_text(json.dumps(data))
     return {"message": "Direction sent to all clients", "direction": direction}
 
+@app.get("/menu/{menu}")
+async def send_menu(menu: str = Path(...)):
+    data = {"menu": menu}
+    print(data)
+    for client in clients:
+        await client.send_text(json.dumps(data))
+    return {"message": "Menu sent to all clients", "menu": menu}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
